@@ -295,6 +295,12 @@ body {
 .quiz-progress { font-size: 13px; color: var(--ink-soft); }
 .quiz-stem { font-size: 16px; font-weight: 600; margin: 0 0 12px; }
 .quiz-src { font-size: 11px; color: var(--brand-dark); background: #eef2ff; border-radius: 6px; padding: 2px 8px; display: inline-block; margin-bottom: 10px; }
+.quiz-note { font-size: 12.5px; color: var(--ink-soft); background: var(--panel); border-radius: 10px; padding: 10px 12px; margin: 4px 0 14px; }
+.quiz-note b { color: var(--brand-dark); }
+.src-line { font-size: 12px; color: var(--ink-soft); margin-top: 6px; }
+.ref-link { color: var(--brand-dark); text-decoration: none; font-weight: 600; }
+.ref-link:hover { text-decoration: underline; }
+.paper-code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; color: var(--ink-soft); }
 .opts { display: flex; flex-direction: column; gap: 8px; }
 .opt {
   text-align: left;

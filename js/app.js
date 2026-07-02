@@ -228,28 +228,63 @@
         '</span>' + (p ? ' <span class="due">下次複習：' + SRS.dueLabel(p, now()) + '</span>' : '') + '</div>' +
       relationsHtml(node) +
       '<div class="lesson">' + node.lesson.join('') + '</div>' +
-      '<div class="quiz-actions"><button class="btn" id="start-quiz">開始測驗（' + node.quiz.length + ' 題）</button></div>';
+      '<p class="quiz-note">測驗為歷屆考古題，每次自 <b>' + node.quiz.length + '</b> 題題庫中隨機抽 ' +
+        Math.min(DRAW, node.quiz.length) + ' 題（選項亦隨機排序）。答案採官方答案卷，本站不另附解析；可點各題「官方出處」回查依據。</p>' +
+      '<div class="quiz-actions"><button class="btn" id="start-quiz">開始測驗（隨機抽 ' +
+        Math.min(DRAW, node.quiz.length) + ' 題）</button></div>';
 
     openModal(html);
     $('start-quiz').addEventListener('click', function () { startQuiz(node); });
   }
 
+  const DRAW = 5;   // 每次測驗自題池隨機抽題數
+
+  function shuffle(arr) {
+    const a = arr.slice();
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const t = a[i]; a[i] = a[j]; a[j] = t;
+    }
+    return a;
+  }
+
+  // 隨機打亂選項順序並重新對應正解 index，避免記憶答案位置
+  function shuffleOptions(q) {
+    const order = shuffle(q.options.map(function (_, i) { return i; }));
+    return {
+      stem: q.stem,
+      options: order.map(function (i) { return q.options[i]; }),
+      answer: order.indexOf(q.answer),
+      src: q.src, ref: q.ref
+    };
+  }
+
   function startQuiz(node) {
-    const session = { node: node, i: 0, correct: 0, answered: false };
+    const picked = shuffle(node.quiz).slice(0, Math.min(DRAW, node.quiz.length)).map(shuffleOptions);
+    const session = { node: node, questions: picked, i: 0, correct: 0, answered: false };
     renderQuestion(session);
+  }
+
+  // 官方依據連結：http 開頭 → 官方答案卷連結；否則為官方試卷代碼
+  function refHtml(ref) {
+    if (!ref) return '';
+    if (/^https?:/.test(ref)) {
+      return '　<a class="ref-link" href="' + ref + '" target="_blank" rel="noopener">▸ 官方答案卷</a>';
+    }
+    return '　<span class="paper-code">官方試卷代碼：' + ref + '</span>';
   }
 
   function renderQuestion(session) {
     const node = session.node;
-    const total = node.quiz.length;
-    const q = node.quiz[session.i];
+    const total = session.questions.length;
+    const q = session.questions[session.i];
     session.answered = false;
 
     let html =
       '<div class="modal-eyebrow" style="color:var(--brand-dark)">' + node.title + '　·　測驗</div>' +
       '<div class="quiz-head"><span class="quiz-progress">第 ' + (session.i + 1) + ' / ' + total + ' 題</span>' +
         '<span class="quiz-progress">目前答對 ' + session.correct + '</span></div>' +
-      (q.src ? '<span class="quiz-src">考古題來源：' + q.src + '</span>' : '<span class="quiz-src" style="background:#f1f5f9;color:var(--ink-soft)">命題重點自編練習</span>') +
+      '<span class="quiz-src">考古題出處：' + q.src + '</span>' +
       '<p class="quiz-stem">' + q.stem + '</p>' +
       '<div class="opts" id="opts">' +
       q.options.map(function (opt, idx) {
@@ -269,7 +304,7 @@
   function answer(session, choice) {
     if (session.answered) return;
     session.answered = true;
-    const q = session.node.quiz[session.i];
+    const q = session.questions[session.i];
     const correct = q.answer;
     const isRight = choice === correct;
     if (isRight) session.correct++;
@@ -281,11 +316,13 @@
       else if (idx === choice) btn.classList.add('wrong');
     });
 
+    // 只顯示官方答案 + 出處/回查依據，不附加任何解析
     $('explain-slot').innerHTML =
-      '<div class="explain ' + (isRight ? 'right' : 'wrong') + '"><b>' +
-      (isRight ? '答對了！' : '正確答案：' + LETTERS[correct] + '　') + '</b>' + q.explain + '</div>';
+      '<div class="explain ' + (isRight ? 'right' : 'wrong') + '">' +
+      '<b>' + (isRight ? '答對了！' : '正確答案：' + LETTERS[correct]) + '</b>' +
+      '<div class="src-line">官方出處：' + q.src + refHtml(q.ref) + '</div></div>';
 
-    const last = session.i === session.node.quiz.length - 1;
+    const last = session.i === session.questions.length - 1;
     $('quiz-actions').innerHTML = '<button class="btn" id="quiz-next">' + (last ? '看結果' : '下一題') + '</button>';
     $('quiz-next').addEventListener('click', function () {
       if (last) { finishQuiz(session); }
@@ -295,7 +332,7 @@
 
   function finishQuiz(session) {
     const node = session.node;
-    const total = node.quiz.length;
+    const total = session.questions.length;
     const ratio = session.correct / total;
     const prev = Store.getNode(state, node.id);
     const updated = SRS.review(prev, ratio, now());
